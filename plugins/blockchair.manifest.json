@@ -1,0 +1,346 @@
+{
+  "identifier": "run.vineyard.pluginpacks.blockchair",
+  "content_type": "vineyard:pluginpack",
+  "name": "Blockchair",
+  "version": "1.0.0",
+  "summary": "Blockchair lookups for Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash and Zcash: first and last use, balances, transactions with their inputs and outputs, and which chains an address was used on. Needs a Blockchair API key.",
+  "description": "For following money on Bitcoin and the chains built like it — Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash and Zcash's transparent addresses: when an address was first and last used, what it received and spent, the transactions that moved its coins and who was on the other side, and which of these chains a legacy `1…` or `3…` was used on.\n\n**Needs:** a Blockchair API key from a paid Premium API plan (https://blockchair.com/api/plans). Blockchair allows keyless use only for personal, testing, non-commercial and academic work, and asks every commercial project for a key at any volume. Use your own key.\n\n**Cost:** requests use points from the key's daily quota (10.9 for 100 addresses, 1.9 for ten transactions); each run's summary gives the total.\n\n**Who sees it:** Blockchair receives every address and transaction looked up, with your key. No one else is contacted.\n\n**Read results with care:**\n\n- Balances and dates are confirmed only. Explorers count some early outputs differently, so another may show a different balance.\n- History from before a chain split (Bitcoin Cash in 2017, Bitcoin SV in 2018) appears on both sides of it: one string, separate accounts.\n- A busy transaction shows its largest counterparties first; the rest are counted, not drawn.\n- Shielded Zcash transfers cannot be followed.\n\n**Data:** Blockchair's, under its terms of service (https://blockchair.com/terms).\n\n**Source:** https://github.com/Vineyard-Intelligence/pluginpack-blockchair (Apache-2.0)",
+  "author": {
+    "name": "VINEYARD",
+    "url": "https://vineyard.run"
+  },
+  "license": "Apache-2.0",
+  "icon": "blocks",
+  "platforms": {
+    "primary": "web",
+    "web": {
+      "runtime": "sandbox-js",
+      "entry": "dist/pack.mjs"
+    },
+    "desktop": {
+      "runtime": "sandbox-js",
+      "entry": "dist/pack.mjs"
+    }
+  },
+  "plugins": [
+    {
+      "identifier": "run.vineyard.plugins.blockchair_address_summary",
+      "content_type": "vineyard:plugin",
+      "name": "Blockchair Address Summary",
+      "version": "1.0.0",
+      "description": "Looks up each selected Crypto Address on Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash or Zcash in Blockchair, 100 per request, and writes its confirmed balance (balance_as_of, balance_source), first_seen and last_seen, address_kind, and the totals and dates Blockchair alone gives: blockchair_received, blockchair_spent, blockchair_first_received, blockchair_last_received, blockchair_first_spent, blockchair_last_spent and blockchair_output_count. An address never used on its network gets a zero balance and blockchair_output_count 0. Nothing is created. Needs a Blockchair API key.",
+      "icon": "wallet",
+      "platforms": {
+        "primary": "web",
+        "web": {
+          "runtime": "sandbox-js",
+          "entry": "dist/pack.mjs"
+        },
+        "desktop": {
+          "runtime": "sandbox-js",
+          "entry": "dist/pack.mjs"
+        }
+      },
+      "io": {
+        "consumes": [
+          {
+            "typepack": "run.vineyard.typepacks.cryptocurrency",
+            "category": "cryptocurrency",
+            "name": "crypto_address"
+          }
+        ],
+        "produces": []
+      },
+      "scopes": {
+        "graph": [
+          "node:read",
+          "node:update"
+        ],
+        "network": [
+          {
+            "endpoint": "https://api.blockchair.com/",
+            "methods": [
+              "GET"
+            ],
+            "purpose": "Read address and transaction dashboards for Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash and Zcash, with your API key."
+          }
+        ],
+        "config": [
+          {
+            "key": "api_key",
+            "label": "Blockchair API key",
+            "type": "string",
+            "secret": true,
+            "optional": false
+          }
+        ]
+      },
+      "lifecycle": {
+        "persistence": "opt-in",
+        "controls": [
+          "progress",
+          "cancel"
+        ],
+        "progress": "determinate"
+      }
+    },
+    {
+      "identifier": "run.vineyard.plugins.blockchair_address_transactions",
+      "content_type": "vineyard:plugin",
+      "name": "Blockchair Address Transactions",
+      "version": "1.0.0",
+      "description": "Reads the latest (or, with Start from oldest, the earliest) confirmed transactions of each selected Crypto Address on Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash or Zcash from Blockchair. Each becomes a Crypto Transaction (block_height, block_time, fee, tx_kind) linked 'input to' from every address it spends from and 'output to' every address it pays, each link with the amount and the inputs or outputs behind it. The address also gets tx_count, history_examined and history_complete, and the fields Blockchair Address Summary writes. Per transaction, the largest max_counterparties addresses on each side are drawn and the rest counted in blockchair_not_drawn. Needs a Blockchair API key.",
+      "icon": "history",
+      "platforms": {
+        "primary": "web",
+        "web": {
+          "runtime": "sandbox-js",
+          "entry": "dist/pack.mjs"
+        },
+        "desktop": {
+          "runtime": "sandbox-js",
+          "entry": "dist/pack.mjs"
+        }
+      },
+      "params": {
+        "type": "object",
+        "properties": {
+          "max_transactions": {
+            "type": "integer",
+            "title": "Transactions per address",
+            "default": 25,
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many transactions to read for each address. Default 25."
+          },
+          "start": {
+            "type": "string",
+            "title": "Start from",
+            "enum": [
+              "newest",
+              "oldest"
+            ],
+            "default": "newest",
+            "description": "Newest reads the latest transactions; oldest the first ones, where an address's first funding is."
+          },
+          "max_counterparties": {
+            "type": "integer",
+            "title": "Counterparties per side",
+            "default": 25,
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Addresses drawn on each side of one transaction, largest amounts first. The selected addresses are always drawn. Default 25."
+          }
+        }
+      },
+      "io": {
+        "consumes": [
+          {
+            "typepack": "run.vineyard.typepacks.cryptocurrency",
+            "category": "cryptocurrency",
+            "name": "crypto_address"
+          }
+        ],
+        "produces": [
+          {
+            "typepack": "run.vineyard.typepacks.cryptocurrency",
+            "category": "cryptocurrency",
+            "name": "crypto_transaction"
+          },
+          {
+            "typepack": "run.vineyard.typepacks.cryptocurrency",
+            "category": "cryptocurrency",
+            "name": "crypto_address"
+          }
+        ]
+      },
+      "scopes": {
+        "graph": [
+          "node:read",
+          "node:create",
+          "node:update",
+          "edge:read",
+          "edge:create"
+        ],
+        "network": [
+          {
+            "endpoint": "https://api.blockchair.com/",
+            "methods": [
+              "GET"
+            ],
+            "purpose": "Read address and transaction dashboards for Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash and Zcash, with your API key."
+          }
+        ],
+        "config": [
+          {
+            "key": "api_key",
+            "label": "Blockchair API key",
+            "type": "string",
+            "secret": true,
+            "optional": false
+          }
+        ]
+      },
+      "lifecycle": {
+        "persistence": "opt-in",
+        "controls": [
+          "progress",
+          "cancel"
+        ],
+        "progress": "determinate"
+      }
+    },
+    {
+      "identifier": "run.vineyard.plugins.blockchair_transaction",
+      "content_type": "vineyard:plugin",
+      "name": "Blockchair Transaction",
+      "version": "1.0.0",
+      "description": "Looks up each selected Crypto Transaction on Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash or Zcash in Blockchair, ten per request. Writes block_height, block_time, status, fee and tx_kind, with blockchair_input_count, blockchair_output_count and the totals, and links every address it spends from ('input to') and pays ('output to'), each link with the amount and the inputs or outputs behind it. The largest max_counterparties addresses on each side are drawn and the rest counted in blockchair_not_drawn. A transaction Blockchair does not have on the node's network is reported, not changed. Needs a Blockchair API key.",
+      "icon": "arrow-left-right",
+      "platforms": {
+        "primary": "web",
+        "web": {
+          "runtime": "sandbox-js",
+          "entry": "dist/pack.mjs"
+        },
+        "desktop": {
+          "runtime": "sandbox-js",
+          "entry": "dist/pack.mjs"
+        }
+      },
+      "params": {
+        "type": "object",
+        "properties": {
+          "max_counterparties": {
+            "type": "integer",
+            "title": "Counterparties per side",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Addresses drawn on each side of the transaction, largest amounts first. Default 50."
+          }
+        }
+      },
+      "io": {
+        "consumes": [
+          {
+            "typepack": "run.vineyard.typepacks.cryptocurrency",
+            "category": "cryptocurrency",
+            "name": "crypto_transaction"
+          }
+        ],
+        "produces": [
+          {
+            "typepack": "run.vineyard.typepacks.cryptocurrency",
+            "category": "cryptocurrency",
+            "name": "crypto_address"
+          }
+        ]
+      },
+      "scopes": {
+        "graph": [
+          "node:read",
+          "node:create",
+          "node:update",
+          "edge:read",
+          "edge:create"
+        ],
+        "network": [
+          {
+            "endpoint": "https://api.blockchair.com/",
+            "methods": [
+              "GET"
+            ],
+            "purpose": "Read address and transaction dashboards for Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash and Zcash, with your API key."
+          }
+        ],
+        "config": [
+          {
+            "key": "api_key",
+            "label": "Blockchair API key",
+            "type": "string",
+            "secret": true,
+            "optional": false
+          }
+        ]
+      },
+      "lifecycle": {
+        "persistence": "opt-in",
+        "controls": [
+          "progress",
+          "cancel"
+        ],
+        "progress": "determinate"
+      }
+    },
+    {
+      "identifier": "run.vineyard.plugins.blockchair_network_check",
+      "content_type": "vineyard:plugin",
+      "name": "Blockchair Network Check",
+      "version": "1.0.0",
+      "description": "For each selected Crypto Address whose network is unknown, asks Blockchair on every network the string is a valid address on — Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash, Zcash — whether it has been used there. Each network with activity gets its own Crypto Address (in that network's form: CashAddr on Bitcoin Cash, M… for a Litecoin 3…) with the fields Blockchair Address Summary writes, linked 'same address on' from the unknown one with how it was decided (check_blockchair). A format only one network has is settled without activity. The unknown node itself is not changed. Needs a Blockchair API key.",
+      "icon": "scan-search",
+      "platforms": {
+        "primary": "web",
+        "web": {
+          "runtime": "sandbox-js",
+          "entry": "dist/pack.mjs"
+        },
+        "desktop": {
+          "runtime": "sandbox-js",
+          "entry": "dist/pack.mjs"
+        }
+      },
+      "io": {
+        "consumes": [
+          {
+            "typepack": "run.vineyard.typepacks.cryptocurrency",
+            "category": "cryptocurrency",
+            "name": "crypto_address"
+          }
+        ],
+        "produces": [
+          {
+            "typepack": "run.vineyard.typepacks.cryptocurrency",
+            "category": "cryptocurrency",
+            "name": "crypto_address"
+          }
+        ]
+      },
+      "scopes": {
+        "graph": [
+          "node:read",
+          "node:create",
+          "edge:read",
+          "edge:create"
+        ],
+        "network": [
+          {
+            "endpoint": "https://api.blockchair.com/",
+            "methods": [
+              "GET"
+            ],
+            "purpose": "Read address and transaction dashboards for Bitcoin, Bitcoin Cash, Litecoin, Bitcoin SV, Dogecoin, Dash and Zcash, with your API key."
+          }
+        ],
+        "config": [
+          {
+            "key": "api_key",
+            "label": "Blockchair API key",
+            "type": "string",
+            "secret": true,
+            "optional": false
+          }
+        ]
+      },
+      "lifecycle": {
+        "persistence": "opt-in",
+        "controls": [
+          "progress",
+          "cancel"
+        ],
+        "progress": "determinate"
+      }
+    }
+  ]
+}
